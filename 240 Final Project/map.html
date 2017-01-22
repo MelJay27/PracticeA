@@ -1,0 +1,169 @@
+﻿<!--On Standby:
+    David Kelley 
+    Ben Groseclose
+    Melissa Jorgensen
+    Brittney Birecki
+    Kyle Platt
+    
+    CPS 240 Project: Generate campus map to display the frequency of bottle refill stations at CMU -->
+
+<!DOCTYPE html>
+<html>
+<head>
+
+	<title>Cmich Campus Map - Drinking Fountains</title>
+    <!--specifies character encoding for HTML document-->
+	<meta charset="utf-8" />
+    <!--This means that the browser will (probably) render the width of the page at the width of its own screen.-->
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!--imports leaflets js library and css styling-->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.0.1/dist/leaflet.css" />
+	<script src="https://unpkg.com/leaflet@1.0.1/dist/leaflet.js"></script>
+
+    <!--sets css styling for menu, data update, and legend-->
+	<style>#map { width: 100%; height: 685px; }
+body {
+	background-color: #F1EEE8;
+}
+.info { padding: 6px 8px; font: 14px/16px Arial, Helvetica, sans-serif; background: white; background: rgba(255,255,255,0.8); box-shadow: 0 0 15px rgba(0,0,0,0.2); border-radius: 5px; }
+.info h4 { margin: 0 0 5px; color: #777; }
+.header { text-align: center; font-family:"Century Gothic" sans-serif; font-size: 20pt; color: white; background-color: #00C1FF; padding-bottom: 15px; padding-top: 15px;}
+.legend { text-align: left; line-height: 18px; color: #555; } .legend i { width: 18px; height: 18px; float: left; margin-right: 8px; opacity: 0.7; }</style>
+</head>
+<body>
+<div class="header">Take Back the Tap</div>
+<div id='map'></div>
+<!--imports javascript-->
+<script type="text/javascript" src="map.js"></script>
+<script type="text/javascript">
+
+  
+    //creates an oject that inherits from the map class; map is the central class of the API
+    //L.map Instantiates a map object given a div element (or its id); uses 'map' div
+    var map = L.map('map').setView([43.587960, -84.774097], 16);
+
+    //generates map API underlay
+	L.tileLayer('http://{s}.tile.osm.org/{z}/{x}/{y}.png', {}).addTo(map);
+
+
+	// info object inherits from the Control class
+	var info = L.control();
+
+	info.onAdd = function (map) {
+		this._div = L.DomUtil.create('div', 'info');
+		this.update();
+		return this._div;
+	};
+
+    //control that allows for an update of the menu prototype object L.control(); it takes in properties from the geoJson objects
+	info.update = function (props) {
+		this._div.innerHTML = '<h4>Drink Responsibly</h4>' +  (props ?
+			 props.name + '<br /br />' +
+             '<table style="width:100%"> <tr> <th><img src="C:/Users/Melissa/Desktop/240 Final Project/Refill Icon.png" width="90" height="90"></th><th><img src="C:/Users/Melissa/Desktop/240 Final Project/Regular Fountain Icon.png" width="90" height="90"></th></tr><tr><th>'
+             + props.numFountains + '</th><th>' + props.numReg + '</th></tr>'
+			: 'Hover over a building');
+	};
+
+	info.addTo(map);
+
+
+	// get color depending on refill station numbers
+	function getColor(d) {
+	    return d > 7 ? '#072331' :
+				d > 6 ? '#082d3f' :
+				d > 5 ? '#135680' :
+				d > 4 ? '#1784bd' :
+				d > 3 ? '#21aefe' :
+				d > 2 ? '#4ebdff' :
+				d > 1 ? '#7acefd' :
+							'#a7e0fd';
+	}
+    //styling function for the GeoJSON layer so that its fillColor depends on feature.properties.numFountains property
+	function style(feature) {
+		return {
+			weight: .5,
+			opacity: 1,
+			color: 'black',
+			dashArray: '',
+			fillOpacity: 0.7,
+			fillColor: getColor(feature.properties.numFountains)
+		};
+	}
+
+    //event listener generates highlight color when building is selected
+	function highlightFeature(e) {
+		var layer = e.target;
+
+		layer.setStyle({
+			weight: 1,
+			color: 'lightblue',
+			dashArray: '',
+			fillOpacity: 0.7
+		});
+
+		if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
+			layer.bringToFront();
+		}
+
+		info.update(layer.feature.properties);
+	}
+
+
+	var geojson;
+
+    //when mouse is not over object, the highlight is removed; will reset the layer style to its default state (defined by our style function).
+	function resetHighlight(e) {
+		geojson.resetStyle(e.target);
+		info.update();
+	}
+    //on mouse click zoom in on geojson object
+	function zoomToFeature(e) {
+		map.fitBounds(e.target.getBounds());
+	}
+
+    //defines what behavios happens when a user's mouse runs over a map element; adds event listeners to each GEOJSON element
+	function onEachFeature(feature, layer) {
+		layer.on({
+			mouseover: highlightFeature,
+			mouseout: resetHighlight,
+			click: zoomToFeature
+		});
+	}
+   
+    //accepts an object in GeoJSON format to display on the map; extends FeatureGroup.
+	geojson = L.geoJson(campusData, {
+	    style: style,
+		onEachFeature: onEachFeature
+	}).addTo(map);
+
+    //leaflet placement function for legend; uses control which is a Leaflet base class 
+	var legend = L.control({position: 'bottomright'});
+
+    //create the legend and feed data in via two arrays and for loop
+	//contain code that creates DOM elements for the overlay
+	legend.onAdd = function (map) {
+
+	    var div = L.DomUtil.create('div', 'info legend'), // creates a div with a class "info"
+			grades = [0, 1, 2, 3, 4, 5, 6, 7],
+			labels = [],
+			from, to;
+
+		for (var i = 0; i < grades.length; i++) {
+			from = grades[i];
+			to = grades[i + 1];
+
+			labels.push(
+				'<i style="background:' + getColor(from + 1) + '"></i> ' +
+				from + (to ? '&ndash;' + to : '+'));
+		}
+
+		div.innerHTML = labels.join('<br>');
+		return div;
+	};
+
+	legend.addTo(map);
+
+</script>
+</body>
+</html>
